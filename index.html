@@ -4,162 +4,131 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Par3-ganu POS System</title>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide-react/0.263.1/lucide-react.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Par3-ganu POS">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏌️</text></svg>">
     <style>
         body { 
-            margin: 0; 
-            padding: 0; 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            -khtml-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
+            margin: 0;
+            padding: 0;
         }
-        .transform { transition: transform 0.2s; }
-        .hover\\:scale-105:hover { transform: scale(1.05); }
-        .shadow-xl { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
-        .hover\\:shadow-xl:hover { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); }
-        
-        /* iPad optimizations */
-        @media (min-width: 768px) {
-            .touch-target { min-height: 44px; min-width: 44px; }
+        .btn {
+            transition: all 0.2s;
         }
-        
-        /* Prevent zoom on double tap */
-        * { touch-action: manipulation; }
+        .btn:hover {
+            transform: scale(1.05);
+        }
+        .cart-item {
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
-<body>
-    <div id="root"></div>
+<body class="bg-gray-50">
+    <div id="app"></div>
 
-    <script type="text/babel">
-        const { useState, useEffect } = React;
-        const { Plus, Minus, Trash2, DollarSign, QrCode, BarChart3, Settings } = lucide;
-
-        const Par3GanuPOS = () => {
-            // State management
-            const [currentUser, setCurrentUser] = useState('');
-            const [cart, setCart] = useState([]);
-            const [sales, setSales] = useState([]);
-            const [ballBucketPrice, setBallBucketPrice] = useState(15.00);
-            const [showSettings, setShowSettings] = useState(false);
-            const [showSalesHistory, setShowSalesHistory] = useState(false);
-            const [showLogin, setShowLogin] = useState(true);
-
-            // Admin users
-            const adminUsers = ['Anis', 'Azhar', 'Tam'];
-
-            // Load data from localStorage on component mount
-            useEffect(() => {
-                const savedSales = localStorage.getItem('par3-ganu-sales');
-                if (savedSales) {
-                    setSales(JSON.parse(savedSales));
-                }
+    <script>
+        class Par3GanuPOS {
+            constructor() {
+                this.currentUser = '';
+                this.cart = [];
+                this.sales = JSON.parse(localStorage.getItem('par3-ganu-sales') || '[]');
+                this.ballBucketPrice = parseFloat(localStorage.getItem('par3-ganu-price') || '15.00');
+                this.showLogin = true;
+                this.showSettings = false;
+                this.showSalesHistory = false;
+                this.adminUsers = ['Anis', 'Azhar', 'Tam'];
                 
-                const savedPrice = localStorage.getItem('par3-ganu-price');
-                if (savedPrice) {
-                    setBallBucketPrice(parseFloat(savedPrice));
-                }
-            }, []);
+                this.init();
+            }
 
-            // Save sales to localStorage whenever sales change
-            useEffect(() => {
-                localStorage.setItem('par3-ganu-sales', JSON.stringify(sales));
-            }, [sales]);
+            init() {
+                this.render();
+            }
 
-            // Save price to localStorage whenever price changes
-            useEffect(() => {
-                localStorage.setItem('par3-ganu-price', ballBucketPrice.toString());
-            }, [ballBucketPrice]);
+            saveSales() {
+                localStorage.setItem('par3-ganu-sales', JSON.stringify(this.sales));
+            }
 
-            // Login handler
-            const handleLogin = (user) => {
-                setCurrentUser(user);
-                setShowLogin(false);
-            };
+            savePrice() {
+                localStorage.setItem('par3-ganu-price', this.ballBucketPrice.toString());
+            }
 
-            // Add item to cart
-            const addToCart = () => {
-                const existingItem = cart.find(item => item.id === 'range-balls');
+            handleLogin(user) {
+                this.currentUser = user;
+                this.showLogin = false;
+                this.render();
+            }
+
+            addToCart() {
+                const existingItem = this.cart.find(item => item.id === 'range-balls');
                 if (existingItem) {
-                    setCart(cart.map(item => 
-                        item.id === 'range-balls' 
-                            ? { ...item, quantity: item.quantity + 1 }
-                            : item
-                    ));
+                    existingItem.quantity += 1;
                 } else {
-                    setCart([...cart, {
+                    this.cart.push({
                         id: 'range-balls',
                         name: 'Range Ball Bucket',
-                        price: ballBucketPrice,
+                        price: this.ballBucketPrice,
                         quantity: 1
-                    }]);
+                    });
                 }
-            };
+                this.render();
+            }
 
-            // Update quantity
-            const updateQuantity = (id, change) => {
-                setCart(cart.map(item => {
+            updateQuantity(id, change) {
+                this.cart = this.cart.map(item => {
                     if (item.id === id) {
                         const newQuantity = item.quantity + change;
-                        return newQuantity > 0 ? { ...item, quantity: newQuantity } : null;
+                        if (newQuantity <= 0) return null;
+                        return { ...item, quantity: newQuantity };
                     }
                     return item;
-                }).filter(Boolean));
-            };
+                }).filter(Boolean);
+                this.render();
+            }
 
-            // Remove item from cart
-            const removeFromCart = (id) => {
-                setCart(cart.filter(item => item.id !== id));
-            };
+            removeFromCart(id) {
+                this.cart = this.cart.filter(item => item.id !== id);
+                this.render();
+            }
 
-            // Calculate total
-            const getTotal = () => {
-                return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
-            };
+            getTotal() {
+                return this.cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+            }
 
-            // Process payment
-            const processPayment = (paymentType) => {
-                if (cart.length === 0) return;
+            processPayment(paymentType) {
+                if (this.cart.length === 0) return;
 
-                const total = getTotal();
+                const total = this.getTotal();
                 const newSale = {
                     id: Date.now().toString(),
-                    items: [...cart],
+                    items: [...this.cart],
                     total: total,
                     paymentType,
-                    staff: currentUser,
+                    staff: this.currentUser,
                     timestamp: new Date().toISOString(),
                     date: new Date().toLocaleDateString(),
                     time: new Date().toLocaleTimeString()
                 };
 
-                setSales([...sales, newSale]);
-                setCart([]);
+                this.sales.unshift(newSale);
+                this.saveSales();
+                this.cart = [];
                 
-                // Show success message
-                alert(`✅ Sale Completed!\n\nTotal: $${total.toFixed(2)}\nPayment: ${paymentType}\nStaff: ${currentUser}`);
-            };
+                alert(`✅ Sale Completed!\\n\\nTotal: RM ${total.toFixed(2)}\\nPayment: ${paymentType}\\nStaff: ${this.currentUser}`);
+                this.render();
+            }
 
-            // Clear cart
-            const clearCart = () => {
-                setCart([]);
-            };
+            clearCart() {
+                this.cart = [];
+                this.render();
+            }
 
-            // Calculate daily totals
-            const getDailyTotals = () => {
+            getDailyTotals() {
                 const today = new Date().toLocaleDateString();
-                const todaySales = sales.filter(sale => sale.date === today);
+                const todaySales = this.sales.filter(sale => sale.date === today);
                 
                 return {
                     totalSales: todaySales.length,
@@ -167,527 +136,295 @@
                     qrPayments: todaySales.filter(sale => sale.paymentType === 'QR').length,
                     cashPayments: todaySales.filter(sale => sale.paymentType === 'Cash').length
                 };
-            };
-
-            const dailyTotals = getDailyTotals();
-
-            // Login screen
-            if (showLogin) {
-                return React.createElement('div', {
-                    className: "min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-8"
-                }, React.createElement('div', {
-                    className: "bg-white rounded-2xl shadow-2xl p-12 w-full max-w-lg"
-                }, [
-                    React.createElement('div', {
-                        key: 'header',
-                        className: "text-center mb-12"
-                    }, [
-                        React.createElement('h1', {
-                            key: 'title',
-                            className: "text-5xl font-bold text-green-800 mb-4"
-                        }, "🏌️ Par3-ganu"),
-                        React.createElement('p', {
-                            key: 'subtitle',
-                            className: "text-gray-600 text-xl"
-                        }, "Golf Range POS System"),
-                        React.createElement('p', {
-                            key: 'version',
-                            className: "text-gray-400 text-sm mt-2"
-                        }, "Version 1.0 • Professional Edition")
-                    ]),
-                    React.createElement('div', {
-                        key: 'login-section',
-                        className: "space-y-6"
-                    }, [
-                        React.createElement('h2', {
-                            key: 'select-user',
-                            className: "text-2xl font-semibold text-center mb-8"
-                        }, "Select User"),
-                        ...adminUsers.map(user => 
-                            React.createElement('button', {
-                                key: user,
-                                onClick: () => handleLogin(user),
-                                className: "w-full bg-green-600 text-white py-6 px-8 rounded-xl hover:bg-green-700 transition-colors font-medium text-xl shadow-lg hover:shadow-xl transform hover:scale-105 touch-target"
-                            }, user)
-                        )
-                    ])
-                ]));
             }
 
-            // Settings screen
-            if (showSettings) {
-                return React.createElement('div', {
-                    className: "min-h-screen bg-gray-50 p-8"
-                }, React.createElement('div', {
-                    className: "max-w-4xl mx-auto"
-                }, React.createElement('div', {
-                    className: "bg-white rounded-2xl shadow-xl p-8"
-                }, [
-                    React.createElement('div', {
-                        key: 'settings-header',
-                        className: "flex justify-between items-center mb-8"
-                    }, [
-                        React.createElement('h2', {
-                            key: 'settings-title',
-                            className: "text-3xl font-bold text-gray-800"
-                        }, "Settings"),
-                        React.createElement('button', {
-                            key: 'back-button',
-                            onClick: () => setShowSettings(false),
-                            className: "bg-gray-500 text-white px-8 py-4 rounded-xl hover:bg-gray-600 text-lg font-medium touch-target"
-                        }, "Back to POS")
-                    ]),
-                    React.createElement('div', {
-                        key: 'settings-content',
-                        className: "grid grid-cols-1 md:grid-cols-2 gap-8"
-                    }, [
-                        React.createElement('div', {
-                            key: 'price-setting',
-                            className: "bg-gray-50 rounded-xl p-6"
-                        }, [
-                            React.createElement('label', {
-                                key: 'price-label',
-                                className: "block text-lg font-medium text-gray-700 mb-4"
-                            }, "Range Ball Bucket Price (MYR)"),
-                            React.createElement('input', {
-                                key: 'price-input',
-                                type: "number",
-                                step: "0.01",
-                                value: ballBucketPrice,
-                                onChange: (e) => setBallBucketPrice(parseFloat(e.target.value) || 0),
-                                className: "w-full px-6 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-2xl font-medium"
-                            })
-                        ]),
-                        React.createElement('div', {
-                            key: 'user-setting',
-                            className: "bg-gray-50 rounded-xl p-6"
-                        }, [
-                            React.createElement('h3', {
-                                key: 'user-title',
-                                className: "text-lg font-semibold mb-4"
-                            }, "Current User"),
-                            React.createElement('p', {
-                                key: 'user-name',
-                                className: "text-gray-600 text-xl mb-6"
-                            }, currentUser),
-                            React.createElement('button', {
-                                key: 'switch-user',
-                                onClick: () => setShowLogin(true),
-                                className: "w-full bg-red-500 text-white px-6 py-4 rounded-xl hover:bg-red-600 font-medium text-lg touch-target"
-                            }, "Switch User")
-                        ])
-                    ])
-                ])));
+            render() {
+                const app = document.getElementById('app');
+                
+                if (this.showLogin) {
+                    app.innerHTML = this.renderLogin();
+                } else if (this.showSettings) {
+                    app.innerHTML = this.renderSettings();
+                } else if (this.showSalesHistory) {
+                    app.innerHTML = this.renderSalesHistory();
+                } else {
+                    app.innerHTML = this.renderPOS();
+                }
             }
 
-            // Sales history screen
-            if (showSalesHistory) {
-                return React.createElement('div', {
-                    className: "min-h-screen bg-gray-50 p-8"
-                }, React.createElement('div', {
-                    className: "max-w-6xl mx-auto"
-                }, React.createElement('div', {
-                    className: "bg-white rounded-2xl shadow-xl p-8"
-                }, [
-                    React.createElement('div', {
-                        key: 'sales-header',
-                        className: "flex justify-between items-center mb-8"
-                    }, [
-                        React.createElement('h2', {
-                            key: 'sales-title',
-                            className: "text-3xl font-bold text-gray-800"
-                        }, "Sales History"),
-                        React.createElement('button', {
-                            key: 'back-to-pos',
-                            onClick: () => setShowSalesHistory(false),
-                            className: "bg-gray-500 text-white px-8 py-4 rounded-xl hover:bg-gray-600 text-lg font-medium touch-target"
-                        }, "Back to POS")
-                    ]),
-                    React.createElement('div', {
-                        key: 'daily-summary',
-                        className: "grid grid-cols-2 md:grid-cols-4 gap-6 mb-8"
-                    }, [
-                        React.createElement('div', {
-                            key: 'total-sales',
-                            className: "bg-green-100 p-6 rounded-xl text-center"
-                        }, [
-                            React.createElement('div', {
-                                key: 'sales-number',
-                                className: "text-4xl font-bold text-green-800"
-                            }, dailyTotals.totalSales),
-                            React.createElement('div', {
-                                key: 'sales-label',
-                                className: "text-green-600 text-lg"
-                            }, "Total Sales Today")
-                        ]),
-                        React.createElement('div', {
-                            key: 'total-revenue',
-                            className: "bg-blue-100 p-6 rounded-xl text-center"
-                        }, [
-                            React.createElement('div', {
-                                key: 'revenue-number',
-                                className: "text-4xl font-bold text-blue-800"
-                            }, `RM ${dailyTotals.totalRevenue.toFixed(2)}`),
-                            React.createElement('div', {
-                                key: 'revenue-label',
-                                className: "text-blue-600 text-lg"
-                            }, "Revenue Today")
-                        ]),
-                        React.createElement('div', {
-                            key: 'qr-payments',
-                            className: "bg-purple-100 p-6 rounded-xl text-center"
-                        }, [
-                            React.createElement('div', {
-                                key: 'qr-number',
-                                className: "text-4xl font-bold text-purple-800"
-                            }, dailyTotals.qrPayments),
-                            React.createElement('div', {
-                                key: 'qr-label',
-                                className: "text-purple-600 text-lg"
-                            }, "QR Payments")
-                        ]),
-                        React.createElement('div', {
-                            key: 'cash-payments',
-                            className: "bg-yellow-100 p-6 rounded-xl text-center"
-                        }, [
-                            React.createElement('div', {
-                                key: 'cash-number',
-                                className: "text-4xl font-bold text-yellow-800"
-                            }, dailyTotals.cashPayments),
-                            React.createElement('div', {
-                                key: 'cash-label',
-                                className: "text-yellow-600 text-lg"
-                            }, "Cash Payments")
-                        ])
-                    ]),
-                    React.createElement('div', {
-                        key: 'sales-list',
-                        className: "space-y-4 max-h-96 overflow-y-auto"
-                    }, sales.length === 0 ? 
-                        React.createElement('div', {
-                            key: 'no-sales',
-                            className: "text-center py-12 text-gray-500"
-                        }, "No sales recorded yet") :
-                        sales.slice().reverse().map(sale => 
-                            React.createElement('div', {
-                                key: sale.id,
-                                className: "border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow"
-                            }, [
-                                React.createElement('div', {
-                                    key: 'sale-header',
-                                    className: "flex justify-between items-start"
-                                }, [
-                                    React.createElement('div', {
-                                        key: 'sale-info'
-                                    }, [
-                                        React.createElement('div', {
-                                            key: 'sale-id',
-                                            className: "font-medium text-lg"
-                                        }, `Sale #${sale.id.slice(-6)}`),
-                                        React.createElement('div', {
-                                            key: 'sale-date',
-                                            className: "text-gray-500"
-                                        }, `${sale.date} at ${sale.time}`),
-                                        React.createElement('div', {
-                                            key: 'sale-staff',
-                                            className: "text-gray-600"
-                                        }, `Staff: ${sale.staff}`)
-                                    ]),
-                                    React.createElement('div', {
-                                        key: 'sale-amount',
-                                        className: "text-right"
-                                    }, [
-                                        React.createElement('div', {
-                                            key: 'sale-total',
-                                            className: "text-2xl font-bold text-green-600"
-                                        }, `RM ${sale.total.toFixed(2)}`),
-                                        React.createElement('div', {
-                                            key: 'sale-payment',
-                                            className: "text-gray-500 text-lg"
-                                        }, sale.paymentType)
-                                    ])
-                                ]),
-                                React.createElement('div', {
-                                    key: 'sale-items',
-                                    className: "mt-4 text-gray-600"
-                                }, sale.items.map(item => 
-                                    React.createElement('div', {
-                                        key: item.id,
-                                        className: "text-lg"
-                                    }, `${item.quantity}x ${item.name} @ RM ${item.price.toFixed(2)}`)
-                                ))
-                            ])
-                        )
-                    )
-                ])));
+            renderLogin() {
+                return `
+                    <div class="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-8">
+                        <div class="bg-white rounded-2xl shadow-2xl p-12 w-full max-w-lg">
+                            <div class="text-center mb-12">
+                                <h1 class="text-5xl font-bold text-green-800 mb-4">🏌️ Par3-ganu</h1>
+                                <p class="text-gray-600 text-xl">Golf Range POS System</p>
+                                <p class="text-gray-400 text-sm mt-2">Version 1.0 • Professional Edition</p>
+                            </div>
+                            
+                            <div class="space-y-6">
+                                <h2 class="text-2xl font-semibold text-center mb-8">Select User</h2>
+                                ${this.adminUsers.map(user => `
+                                    <button onclick="pos.handleLogin('${user}')" 
+                                            class="w-full bg-green-600 text-white py-6 px-8 rounded-xl hover:bg-green-700 transition-colors font-medium text-xl shadow-lg hover:shadow-xl btn">
+                                        ${user}
+                                    </button>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
             }
 
-            // Main POS interface
-            return React.createElement('div', {
-                className: "min-h-screen bg-gray-50 p-8"
-            }, React.createElement('div', {
-                className: "max-w-7xl mx-auto"
-            }, [
-                React.createElement('div', {
-                    key: 'header',
-                    className: "bg-white rounded-2xl shadow-xl p-8 mb-8"
-                }, React.createElement('div', {
-                    className: "flex justify-between items-center"
-                }, [
-                    React.createElement('div', {
-                        key: 'title-section'
-                    }, [
-                        React.createElement('h1', {
-                            key: 'main-title',
-                            className: "text-4xl font-bold text-green-800"
-                        }, "🏌️ Par3-ganu POS"),
-                        React.createElement('p', {
-                            key: 'welcome',
-                            className: "text-gray-600 text-xl"
-                        }, `Welcome back, ${currentUser}`)
-                    ]),
-                    React.createElement('div', {
-                        key: 'nav-buttons',
-                        className: "flex space-x-4"
-                    }, [
-                        React.createElement('button', {
-                            key: 'sales-button',
-                            onClick: () => setShowSalesHistory(true),
-                            className: "bg-blue-500 text-white px-8 py-4 rounded-xl hover:bg-blue-600 flex items-center space-x-3 text-lg font-medium shadow-lg hover:shadow-xl transform hover:scale-105 touch-target"
-                        }, [
-                            React.createElement(BarChart3, { key: 'chart-icon', size: 24 }),
-                            React.createElement('span', { key: 'sales-text' }, "Sales History")
-                        ]),
-                        React.createElement('button', {
-                            key: 'settings-button',
-                            onClick: () => setShowSettings(true),
-                            className: "bg-gray-500 text-white px-8 py-4 rounded-xl hover:bg-gray-600 flex items-center space-x-3 text-lg font-medium shadow-lg hover:shadow-xl transform hover:scale-105 touch-target"
-                        }, [
-                            React.createElement(Settings, { key: 'settings-icon', size: 24 }),
-                            React.createElement('span', { key: 'settings-text' }, "Settings")
-                        ])
-                    ])
-                ])),
-                React.createElement('div', {
-                    key: 'main-content',
-                    className: "grid grid-cols-1 lg:grid-cols-3 gap-8"
-                }, [
-                    React.createElement('div', {
-                        key: 'products-section',
-                        className: "lg:col-span-2"
-                    }, React.createElement('div', {
-                        className: "bg-white rounded-2xl shadow-xl p-8"
-                    }, [
-                        React.createElement('h2', {
-                            key: 'products-title',
-                            className: "text-2xl font-semibold mb-6"
-                        }, "Products"),
-                        React.createElement('div', {
-                            key: 'products-grid',
-                            className: "grid grid-cols-1 md:grid-cols-2 gap-6"
-                        }, React.createElement('div', {
-                            className: "border-2 border-gray-200 rounded-xl p-6 hover:bg-gray-50 cursor-pointer hover:border-green-300 transition-all duration-200 shadow-md hover:shadow-lg",
-                            onClick: addToCart
-                        }, React.createElement('div', {
-                            className: "flex justify-between items-center"
-                        }, [
-                            React.createElement('div', {
-                                key: 'product-info'
-                            }, [
-                                React.createElement('h3', {
-                                    key: 'product-name',
-                                    className: "font-medium text-xl"
-                                }, "Range Ball Bucket"),
-                                React.createElement('p', {
-                                    key: 'product-desc',
-                                    className: "text-gray-500"
-                                }, "Standard size bucket")
-                            ]),
-                            React.createElement('div', {
-                                key: 'product-action',
-                                className: "text-right"
-                            }, [
-                                React.createElement('div', {
-                                    key: 'product-price',
-                                    className: "text-2xl font-bold text-green-600"
-                                }, `RM ${ballBucketPrice.toFixed(2)}`),
-                                React.createElement('button', {
-                                    key: 'add-button',
-                                    className: "bg-green-500 text-white px-6 py-3 rounded-xl text-lg hover:bg-green-600 mt-2 shadow-md hover:shadow-lg transform hover:scale-105 touch-target"
-                                }, [
-                                    React.createElement(Plus, { key: 'plus-icon', size: 20, className: "inline mr-2" }),
-                                    "Add to Cart"
-                                ])
-                            ])
-                        ])))
-                    ])),
-                    React.createElement('div', {
-                        key: 'cart-section'
-                    }, [
-                        React.createElement('div', {
-                            key: 'cart-container',
-                            className: "bg-white rounded-2xl shadow-xl p-8"
-                        }, [
-                            React.createElement('h2', {
-                                key: 'cart-title',
-                                className: "text-2xl font-semibold mb-6"
-                            }, "Current Sale"),
-                            cart.length === 0 ? 
-                                React.createElement('div', {
-                                    key: 'empty-cart',
-                                    className: "text-center py-12"
-                                }, [
-                                    React.createElement('p', {
-                                        key: 'empty-text',
-                                        className: "text-gray-500 text-xl"
-                                    }, "Cart is empty"),
-                                    React.createElement('p', {
-                                        key: 'empty-subtext',
-                                        className: "text-gray-400 mt-2"
-                                    }, "Add items to start a sale")
-                                ]) :
-                                React.createElement('div', {
-                                    key: 'cart-items',
-                                    className: "space-y-6"
-                                }, [
-                                    ...cart.map(item => 
-                                        React.createElement('div', {
-                                            key: item.id,
-                                            className: "bg-gray-50 rounded-xl p-4"
-                                        }, [
-                                            React.createElement('div', {
-                                                key: 'item-header',
-                                                className: "flex justify-between items-start mb-4"
-                                            }, [
-                                                React.createElement('div', {
-                                                    key: 'item-info'
-                                                }, [
-                                                    React.createElement('div', {
-                                                        key: 'item-name',
-                                                        className: "font-medium text-lg"
-                                                    }, item.name),
-                                                    React.createElement('div', {
-                                                        key: 'item-price',
-                                                        className: "text-gray-500"
-                                                    }, `RM ${item.price.toFixed(2)} each`)
-                                                ]),
-                                                React.createElement('button', {
-                                                    key: 'remove-button',
-                                                    onClick: () => removeFromCart(item.id),
-                                                    className: "bg-red-500 text-white p-2 rounded-lg hover:bg-red-600 touch-target"
-                                                }, React.createElement(Trash2, { size: 18 }))
-                                            ]),
-                                            React.createElement('div', {
-                                                key: 'quantity-controls',
-                                                className: "flex items-center justify-center space-x-4"
-                                            }, [
-                                                React.createElement('button', {
-                                                    key: 'decrease',
-                                                    onClick: () => updateQuantity(item.id, -1),
-                                                    className: "bg-red-500 text-white p-3 rounded-lg hover:bg-red-600 shadow-md touch-target"
-                                                }, React.createElement(Minus, { size: 20 })),
-                                                React.createElement('span', {
-                                                    key: 'quantity',
-                                                    className: "text-2xl font-bold w-12 text-center"
-                                                }, item.quantity),
-                                                React.createElement('button', {
-                                                    key: 'increase',
-                                                    onClick: () => updateQuantity(item.id, 1),
-                                                    className: "bg-green-500 text-white p-3 rounded-lg hover:bg-green-600 shadow-md touch-target"
-                                                }, React.createElement(Plus, { size: 20 }))
-                                            ])
-                                        ])
-                                    ),
-                                    React.createElement('div', {
-                                        key: 'cart-total',
-                                        className: "border-t pt-6"
-                                    }, [
-                                        React.createElement('div', {
-                                            key: 'total-display',
-                                            className: "flex justify-between items-center text-3xl font-bold mb-6"
-                                        }, [
-                                            React.createElement('span', { key: 'total-label' }, "Total:"),
-                                            React.createElement('span', {
-                                                key: 'total-amount',
-                                                className: "text-green-600"
-                                            }, `RM ${getTotal().toFixed(2)}`)
-                                        ]),
-                                        React.createElement('div', {
-                                            key: 'payment-buttons',
-                                            className: "space-y-4"
-                                        }, [
-                                            React.createElement('button', {
-                                                key: 'qr-payment',
-                                                onClick: () => processPayment('QR'),
-                                                className: "w-full bg-purple-500 text-white py-6 px-6 rounded-xl hover:bg-purple-600 font-medium flex items-center justify-center space-x-3 text-xl shadow-lg hover:shadow-xl transform hover:scale-105 touch-target"
-                                            }, [
-                                                React.createElement(QrCode, { key: 'qr-icon', size: 28 }),
-                                                React.createElement('span', { key: 'qr-text' }, "QR Payment")
-                                            ]),
-                                            React.createElement('button', {
-                                                key: 'cash-payment',
-                                                onClick: () => processPayment('Cash'),
-                                                className: "w-full bg-green-500 text-white py-6 px-6 rounded-xl hover:bg-green-600 font-medium flex items-center justify-center space-x-3 text-xl shadow-lg hover:shadow-xl transform hover:scale-105 touch-target"
-                                            }, [
-                                                React.createElement(DollarSign, { key: 'cash-icon', size: 28 }),
-                                                React.createElement('span', { key: 'cash-text' }, "Cash Payment")
-                                            ]),
-                                            React.createElement('button', {
-                                                key: 'clear-cart',
-                                                onClick: clearCart,
-                                                className: "w-full bg-gray-500 text-white py-4 px-6 rounded-xl hover:bg-gray-600 text-lg touch-target"
-                                            }, "Clear Cart")
-                                        ])
-                                    ])
-                                ])
-                        ]),
-                        React.createElement('div', {
-                            key: 'daily-summary',
-                            className: "bg-white rounded-2xl shadow-xl p-8 mt-8"
-                        }, [
-                            React.createElement('h3', {
-                                key: 'summary-title',
-                                className: "text-xl font-semibold mb-6"
-                            }, "Today's Summary"),
-                            React.createElement('div', {
-                                key: 'summary-content',
-                                className: "space-y-4"
-                            }, [
-                                React.createElement('div', {
-                                    key: 'sales-summary',
-                                    className: "flex justify-between items-center text-lg"
-                                }, [
-                                    React.createElement('span', { key: 'sales-label' }, "Sales:"),
-                                    React.createElement('span', {
-                                        key: 'sales-count',
-                                        className: "font-bold text-2xl"
-                                    }, dailyTotals.totalSales)
-                                ]),
-                                React.createElement('div', {
-                                    key: 'revenue-summary',
-                                    className: "flex justify-between items-center text-lg"
-                                }, [
-                                    React.createElement('span', { key: 'revenue-label' }, "Revenue:"),
-                                    React.createElement('span', {
-                                        key: 'revenue-amount',
-                                        className: "font-bold text-2xl text-green-600"
-                                    }, `RM ${dailyTotals.totalRevenue.toFixed(2)}`)
-                                ]),
-                                React.createElement('div', {
-                                    key: 'payment-breakdown',
-                                    className: "flex justify-between text-gray-600"
-                                }, [
-                                    React.createElement('span', { key: 'qr-count' }, `QR: ${dailyTotals.qrPayments}`),
-                                    React.createElement('span', { key: 'cash-count' }, `Cash: ${dailyTotals.cashPayments}`)
-                                ])
-                            ])
-                        ])
-                    ])
-                ])
-            ]));
-        };
+            renderSettings() {
+                return `
+                    <div class="min-h-screen bg-gray-50 p-8">
+                        <div class="max-w-4xl mx-auto">
+                            <div class="bg-white rounded-2xl shadow-xl p-8">
+                                <div class="flex justify-between items-center mb-8">
+                                    <h2 class="text-3xl font-bold text-gray-800">Settings</h2>
+                                    <button onclick="pos.showSettings = false; pos.render()" 
+                                            class="bg-gray-500 text-white px-8 py-4 rounded-xl hover:bg-gray-600 text-lg font-medium btn">
+                                        Back to POS
+                                    </button>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div class="bg-gray-50 rounded-xl p-6">
+                                        <label class="block text-lg font-medium text-gray-700 mb-4">
+                                            Range Ball Bucket Price (RM)
+                                        </label>
+                                        <input type="number" step="0.01" value="${this.ballBucketPrice}" 
+                                               onchange="pos.ballBucketPrice = parseFloat(this.value); pos.savePrice()"
+                                               class="w-full px-6 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-2xl font-medium">
+                                    </div>
+                                    
+                                    <div class="bg-gray-50 rounded-xl p-6">
+                                        <h3 class="text-lg font-semibold mb-4">Current User</h3>
+                                        <p class="text-gray-600 text-xl mb-6">${this.currentUser}</p>
+                                        <button onclick="pos.showLogin = true; pos.showSettings = false; pos.render()" 
+                                                class="w-full bg-red-500 text-white px-6 py-4 rounded-xl hover:bg-red-600 font-medium text-lg btn">
+                                            Switch User
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
 
-        ReactDOM.render(React.createElement(Par3GanuPOS), document.getElementById('root'));
+            renderSalesHistory() {
+                const dailyTotals = this.getDailyTotals();
+                
+                return `
+                    <div class="min-h-screen bg-gray-50 p-8">
+                        <div class="max-w-6xl mx-auto">
+                            <div class="bg-white rounded-2xl shadow-xl p-8">
+                                <div class="flex justify-between items-center mb-8">
+                                    <h2 class="text-3xl font-bold text-gray-800">Sales History</h2>
+                                    <button onclick="pos.showSalesHistory = false; pos.render()" 
+                                            class="bg-gray-500 text-white px-8 py-4 rounded-xl hover:bg-gray-600 text-lg font-medium btn">
+                                        Back to POS
+                                    </button>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+                                    <div class="bg-green-100 p-6 rounded-xl text-center">
+                                        <div class="text-4xl font-bold text-green-800">${dailyTotals.totalSales}</div>
+                                        <div class="text-green-600 text-lg">Total Sales Today</div>
+                                    </div>
+                                    <div class="bg-blue-100 p-6 rounded-xl text-center">
+                                        <div class="text-4xl font-bold text-blue-800">RM ${dailyTotals.totalRevenue.toFixed(2)}</div>
+                                        <div class="text-blue-600 text-lg">Revenue Today</div>
+                                    </div>
+                                    <div class="bg-purple-100 p-6 rounded-xl text-center">
+                                        <div class="text-4xl font-bold text-purple-800">${dailyTotals.qrPayments}</div>
+                                        <div class="text-purple-600 text-lg">QR Payments</div>
+                                    </div>
+                                    <div class="bg-yellow-100 p-6 rounded-xl text-center">
+                                        <div class="text-4xl font-bold text-yellow-800">${dailyTotals.cashPayments}</div>
+                                        <div class="text-yellow-600 text-lg">Cash Payments</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="space-y-4 max-h-96 overflow-y-auto">
+                                    ${this.sales.length === 0 ? 
+                                        '<div class="text-center py-12 text-gray-500">No sales recorded yet</div>' :
+                                        this.sales.map(sale => `
+                                            <div class="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
+                                                <div class="flex justify-between items-start">
+                                                    <div>
+                                                        <div class="font-medium text-lg">Sale #${sale.id.slice(-6)}</div>
+                                                        <div class="text-gray-500">${sale.date} at ${sale.time}</div>
+                                                        <div class="text-gray-600">Staff: ${sale.staff}</div>
+                                                    </div>
+                                                    <div class="text-right">
+                                                        <div class="text-2xl font-bold text-green-600">RM ${sale.total.toFixed(2)}</div>
+                                                        <div class="text-gray-500 text-lg">${sale.paymentType}</div>
+                                                    </div>
+                                                </div>
+                                                <div class="mt-4 text-gray-600">
+                                                    ${sale.items.map(item => `
+                                                        <div class="text-lg">${item.quantity}x ${item.name} @ RM ${item.price.toFixed(2)}</div>
+                                                    `).join('')}
+                                                </div>
+                                            </div>
+                                        `).join('')
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            renderPOS() {
+                const dailyTotals = this.getDailyTotals();
+                
+                return `
+                    <div class="min-h-screen bg-gray-50 p-8">
+                        <div class="max-w-7xl mx-auto">
+                            <!-- Header -->
+                            <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <h1 class="text-4xl font-bold text-green-800">🏌️ Par3-ganu POS</h1>
+                                        <p class="text-gray-600 text-xl">Welcome back, ${this.currentUser}</p>
+                                    </div>
+                                    <div class="flex space-x-4">
+                                        <button onclick="pos.showSalesHistory = true; pos.render()" 
+                                                class="bg-blue-500 text-white px-8 py-4 rounded-xl hover:bg-blue-600 flex items-center space-x-3 text-lg font-medium shadow-lg hover:shadow-xl btn">
+                                            <span>📊</span>
+                                            <span>Sales History</span>
+                                        </button>
+                                        <button onclick="pos.showSettings = true; pos.render()" 
+                                                class="bg-gray-500 text-white px-8 py-4 rounded-xl hover:bg-gray-600 flex items-center space-x-3 text-lg font-medium shadow-lg hover:shadow-xl btn">
+                                            <span>⚙️</span>
+                                            <span>Settings</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                <!-- Products -->
+                                <div class="lg:col-span-2">
+                                    <div class="bg-white rounded-2xl shadow-xl p-8">
+                                        <h2 class="text-2xl font-semibold mb-6">Products</h2>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div onclick="pos.addToCart()" 
+                                                 class="border-2 border-gray-200 rounded-xl p-6 hover:bg-gray-50 cursor-pointer hover:border-green-300 transition-all duration-200 shadow-md hover:shadow-lg">
+                                                <div class="flex justify-between items-center">
+                                                    <div>
+                                                        <h3 class="font-medium text-xl">Range Ball Bucket</h3>
+                                                        <p class="text-gray-500">Standard size bucket</p>
+                                                    </div>
+                                                    <div class="text-right">
+                                                        <div class="text-2xl font-bold text-green-600">RM ${this.ballBucketPrice.toFixed(2)}</div>
+                                                        <button class="bg-green-500 text-white px-6 py-3 rounded-xl text-lg hover:bg-green-600 mt-2 shadow-md hover:shadow-lg btn">
+                                                            ➕ Add to Cart
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Cart -->
+                                <div>
+                                    <div class="bg-white rounded-2xl shadow-xl p-8">
+                                        <h2 class="text-2xl font-semibold mb-6">Current Sale</h2>
+                                        
+                                        ${this.cart.length === 0 ? `
+                                            <div class="text-center py-12">
+                                                <p class="text-gray-500 text-xl">Cart is empty</p>
+                                                <p class="text-gray-400 mt-2">Add items to start a sale</p>
+                                            </div>
+                                        ` : `
+                                            <div class="space-y-6">
+                                                ${this.cart.map(item => `
+                                                    <div class="bg-gray-50 rounded-xl p-4 cart-item">
+                                                        <div class="flex justify-between items-start mb-4">
+                                                            <div>
+                                                                <div class="font-medium text-lg">${item.name}</div>
+                                                                <div class="text-gray-500">RM ${item.price.toFixed(2)} each</div>
+                                                            </div>
+                                                            <button onclick="pos.removeFromCart('${item.id}')" 
+                                                                    class="bg-red-500 text-white p-2 rounded-lg hover:bg-red-600 btn">
+                                                                🗑️
+                                                            </button>
+                                                        </div>
+                                                        <div class="flex items-center justify-center space-x-4">
+                                                            <button onclick="pos.updateQuantity('${item.id}', -1)" 
+                                                                    class="bg-red-500 text-white p-3 rounded-lg hover:bg-red-600 shadow-md btn">
+                                                                ➖
+                                                            </button>
+                                                            <span class="text-2xl font-bold w-12 text-center">${item.quantity}</span>
+                                                            <button onclick="pos.updateQuantity('${item.id}', 1)" 
+                                                                    class="bg-green-500 text-white p-3 rounded-lg hover:bg-green-600 shadow-md btn">
+                                                                ➕
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                `).join('')}
+                                                
+                                                <div class="border-t pt-6">
+                                                    <div class="flex justify-between items-center text-3xl font-bold mb-6">
+                                                        <span>Total:</span>
+                                                        <span class="text-green-600">RM ${this.getTotal().toFixed(2)}</span>
+                                                    </div>
+                                                    
+                                                    <div class="space-y-4">
+                                                        <button onclick="pos.processPayment('QR')" 
+                                                                class="w-full bg-purple-500 text-white py-6 px-6 rounded-xl hover:bg-purple-600 font-medium flex items-center justify-center space-x-3 text-xl shadow-lg hover:shadow-xl btn">
+                                                            <span>📱</span>
+                                                            <span>QR Payment</span>
+                                                        </button>
+                                                        <button onclick="pos.processPayment('Cash')" 
+                                                                class="w-full bg-green-500 text-white py-6 px-6 rounded-xl hover:bg-green-600 font-medium flex items-center justify-center space-x-3 text-xl shadow-lg hover:shadow-xl btn">
+                                                            <span>💵</span>
+                                                            <span>Cash Payment</span>
+                                                        </button>
+                                                        <button onclick="pos.clearCart()" 
+                                                                class="w-full bg-gray-500 text-white py-4 px-6 rounded-xl hover:bg-gray-600 text-lg btn">
+                                                            Clear Cart
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        `}
+                                    </div>
+                                    
+                                    <!-- Daily Summary -->
+                                    <div class="bg-white rounded-2xl shadow-xl p-8 mt-8">
+                                        <h3 class="text-xl font-semibold mb-6">Today's Summary</h3>
+                                        <div class="space-y-4">
+                                            <div class="flex justify-between items-center text-lg">
+                                                <span>Sales:</span>
+                                                <span class="font-bold text-2xl">${dailyTotals.totalSales}</span>
+                                            </div>
+                                            <div class="flex justify-between items-center text-lg">
+                                                <span>Revenue:</span>
+                                                <span class="font-bold text-2xl text-green-600">RM ${dailyTotals.totalRevenue.toFixed(2)}</span>
+                                            </div>
+                                            <div class="flex justify-between text-gray-600">
+                                                <span>QR: ${dailyTotals.qrPayments}</span>
+                                                <span>Cash: ${dailyTotals.cashPayments}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Initialize the POS system
+        const pos = new Par3GanuPOS();
     </script>
 </body>
 </html>
