@@ -24,6 +24,22 @@
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        .chart-bar {
+            transition: height 0.5s ease-in-out;
+        }
+        .report-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .export-btn {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+        .print { display: none; }
+        @media print {
+            .no-print { display: none !important; }
+            .print { display: block !important; }
+            body { background: white !important; }
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -39,13 +55,143 @@
                 this.showLogin = true;
                 this.showSettings = false;
                 this.showSalesHistory = false;
+                this.showReports = false;
                 this.adminUsers = ['Anis', 'Azhar', 'Tam'];
+                this.hourlyReports = JSON.parse(localStorage.getItem('par3-ganu-hourly-reports') || '[]');
                 
                 this.init();
+                this.startHourlyReporting();
             }
 
             init() {
                 this.render();
+            }
+
+            startHourlyReporting() {
+                // Generate report every hour (3600000 ms)
+                setInterval(() => {
+                    this.generateHourlyReport();
+                }, 3600000);
+                
+                // Also generate on startup if we haven't generated one this hour
+                const now = new Date();
+                const currentHour = now.getHours();
+                const lastReport = this.hourlyReports[this.hourlyReports.length - 1];
+                
+                if (!lastReport || new Date(lastReport.timestamp).getHours() !== currentHour) {
+                    this.generateHourlyReport();
+                }
+            }
+
+            generateHourlyReport() {
+                const now = new Date();
+                const hourStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), 0, 0);
+                const hourEnd = new Date(hourStart.getTime() + 3600000); // Add 1 hour
+                
+                const hourlySales = this.sales.filter(sale => {
+                    const saleTime = new Date(sale.timestamp);
+                    return saleTime >= hourStart && saleTime < hourEnd;
+                });
+
+                const report = {
+                    timestamp: now.toISOString(),
+                    hour: now.getHours(),
+                    date: now.toLocaleDateString(),
+                    time: `${now.getHours().toString().padStart(2, '0')}:00`,
+                    totalSales: hourlySales.length,
+                    totalRevenue: hourlySales.reduce((sum, sale) => sum + sale.total, 0),
+                    qrPayments: hourlySales.filter(sale => sale.paymentType === 'QR').length,
+                    cashPayments: hourlySales.filter(sale => sale.paymentType === 'Cash').length,
+                    topStaff: this.getTopStaffForPeriod(hourlySales),
+                    averageTransaction: hourlySales.length > 0 ? hourlySales.reduce((sum, sale) => sum + sale.total, 0) / hourlySales.length : 0
+                };
+
+                this.hourlyReports.push(report);
+                
+                // Keep only last 168 hours (7 days)
+                if (this.hourlyReports.length > 168) {
+                    this.hourlyReports = this.hourlyReports.slice(-168);
+                }
+                
+                localStorage.setItem('par3-ganu-hourly-reports', JSON.stringify(this.hourlyReports));
+                
+                console.log(`📊 Hourly Report Generated: ${report.totalSales} sales, RM ${report.totalRevenue.toFixed(2)} revenue`);
+            }
+
+            getTopStaffForPeriod(sales) {
+                const staffSales = {};
+                sales.forEach(sale => {
+                    if (!staffSales[sale.staff]) {
+                        staffSales[sale.staff] = { count: 0, revenue: 0 };
+                    }
+                    staffSales[sale.staff].count++;
+                    staffSales[sale.staff].revenue += sale.total;
+                });
+
+                let topStaff = '';
+                let maxRevenue = 0;
+                
+                Object.keys(staffSales).forEach(staff => {
+                    if (staffSales[staff].revenue > maxRevenue) {
+                        maxRevenue = staffSales[staff].revenue;
+                        topStaff = staff;
+                    }
+                });
+
+                return topStaff || 'N/A';
+            }
+
+            exportToCSV() {
+                const headers = ['Date', 'Time', 'Sale ID', 'Staff', 'Items', 'Total', 'Payment Type'];
+                const csvContent = [
+                    headers.join(','),
+                    ...this.sales.map(sale => [
+                        sale.date,
+                        sale.time,
+                        sale.id,
+                        sale.staff,
+                        sale.items.map(item => `${item.quantity}x ${item.name}`).join(';'),
+                        sale.total.toFixed(2),
+                        sale.paymentType
+                    ].join(','))
+                ].join('\\n');
+
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `par3-ganu-sales-${new Date().toISOString().split('T')[0]}.csv`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+            }
+
+            exportHourlyReportsCSV() {
+                const headers = ['Date', 'Hour', 'Sales Count', 'Revenue (RM)', 'QR Payments', 'Cash Payments', 'Top Staff', 'Avg Transaction'];
+                const csvContent = [
+                    headers.join(','),
+                    ...this.hourlyReports.map(report => [
+                        report.date,
+                        report.time,
+                        report.totalSales,
+                        report.totalRevenue.toFixed(2),
+                        report.qrPayments,
+                        report.cashPayments,
+                        report.topStaff,
+                        report.averageTransaction.toFixed(2)
+                    ].join(','))
+                ].join('\\n');
+
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `par3-ganu-hourly-reports-${new Date().toISOString().split('T')[0]}.csv`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+            }
+
+            printReport() {
+                window.print();
             }
 
             saveSales() {
@@ -138,6 +284,52 @@
                 };
             }
 
+            getWeeklyTotals() {
+                const oneWeekAgo = new Date();
+                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                
+                const weeklySales = this.sales.filter(sale => new Date(sale.timestamp) >= oneWeekAgo);
+                
+                return {
+                    totalSales: weeklySales.length,
+                    totalRevenue: weeklySales.reduce((sum, sale) => sum + sale.total, 0),
+                    qrPayments: weeklySales.filter(sale => sale.paymentType === 'QR').length,
+                    cashPayments: weeklySales.filter(sale => sale.paymentType === 'Cash').length,
+                    averageDaily: weeklySales.reduce((sum, sale) => sum + sale.total, 0) / 7
+                };
+            }
+
+            getStaffPerformance() {
+                const today = new Date().toLocaleDateString();
+                const todaySales = this.sales.filter(sale => sale.date === today);
+                
+                const staffStats = {};
+                this.adminUsers.forEach(user => {
+                    const userSales = todaySales.filter(sale => sale.staff === user);
+                    staffStats[user] = {
+                        sales: userSales.length,
+                        revenue: userSales.reduce((sum, sale) => sum + sale.total, 0)
+                    };
+                });
+                
+                return staffStats;
+            }
+
+            getPeakHours() {
+                const hourlyData = {};
+                for (let i = 0; i < 24; i++) {
+                    hourlyData[i] = { sales: 0, revenue: 0 };
+                }
+
+                this.sales.forEach(sale => {
+                    const hour = new Date(sale.timestamp).getHours();
+                    hourlyData[hour].sales++;
+                    hourlyData[hour].revenue += sale.total;
+                });
+
+                return hourlyData;
+            }
+
             render() {
                 const app = document.getElementById('app');
                 
@@ -147,6 +339,8 @@
                     app.innerHTML = this.renderSettings();
                 } else if (this.showSalesHistory) {
                     app.innerHTML = this.renderSalesHistory();
+                } else if (this.showReports) {
+                    app.innerHTML = this.renderReports();
                 } else {
                     app.innerHTML = this.renderPOS();
                 }
@@ -159,7 +353,7 @@
                             <div class="text-center mb-12">
                                 <h1 class="text-5xl font-bold text-green-800 mb-4">🏌️ Par3-ganu</h1>
                                 <p class="text-gray-600 text-xl">Golf Range POS System</p>
-                                <p class="text-gray-400 text-sm mt-2">Version 1.0 • Professional Edition</p>
+                                <p class="text-gray-400 text-sm mt-2">Version 2.0 • Analytics Edition</p>
                             </div>
                             
                             <div class="space-y-6">
@@ -206,6 +400,16 @@
                                                 class="w-full bg-red-500 text-white px-6 py-4 rounded-xl hover:bg-red-600 font-medium text-lg btn">
                                             Switch User
                                         </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-8 bg-blue-50 rounded-xl p-6">
+                                    <h3 class="text-lg font-semibold mb-4">Automatic Hourly Reports</h3>
+                                    <p class="text-gray-600 mb-4">System automatically generates sales reports every hour. Reports include sales count, revenue, payment types, and staff performance.</p>
+                                    <div class="text-sm text-gray-500">
+                                        <p>📊 Total Reports Generated: ${this.hourlyReports.length}</p>
+                                        <p>⏰ Last Report: ${this.hourlyReports.length > 0 ? new Date(this.hourlyReports[this.hourlyReports.length - 1].timestamp).toLocaleString() : 'None yet'}</p>
+                                        <p>🔄 Next Report: ${new Date(new Date().getTime() + (3600000 - (new Date().getTime() % 3600000))).toLocaleTimeString()}</p>
                                     </div>
                                 </div>
                             </div>
@@ -279,6 +483,199 @@
                 `;
             }
 
+            renderReports() {
+                const dailyTotals = this.getDailyTotals();
+                const weeklyTotals = this.getWeeklyTotals();
+                const staffPerformance = this.getStaffPerformance();
+                const peakHours = this.getPeakHours();
+                const todayHourlyReports = this.hourlyReports.filter(report => 
+                    report.date === new Date().toLocaleDateString()
+                );
+
+                return `
+                    <div class="min-h-screen bg-gray-50 p-8">
+                        <div class="max-w-7xl mx-auto">
+                            <!-- Header -->
+                            <div class="bg-white rounded-2xl shadow-xl p-8 mb-8 no-print">
+                                <div class="flex justify-between items-center">
+                                    <h2 class="text-3xl font-bold text-gray-800">📊 Advanced Analytics & Reports</h2>
+                                    <div class="flex space-x-4">
+                                        <button onclick="pos.exportToCSV()" 
+                                                class="export-btn text-white px-6 py-3 rounded-xl font-medium btn">
+                                            📄 Export Sales CSV
+                                        </button>
+                                        <button onclick="pos.exportHourlyReportsCSV()" 
+                                                class="bg-blue-500 text-white px-6 py-3 rounded-xl hover:bg-blue-600 font-medium btn">
+                                            📈 Export Hourly Reports
+                                        </button>
+                                        <button onclick="pos.printReport()" 
+                                                class="bg-gray-600 text-white px-6 py-3 rounded-xl hover:bg-gray-700 font-medium btn">
+                                            🖨️ Print Report
+                                        </button>
+                                        <button onclick="pos.showReports = false; pos.render()" 
+                                                class="bg-gray-500 text-white px-6 py-3 rounded-xl hover:bg-gray-600 font-medium btn">
+                                            ← Back to POS
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Print Header -->
+                            <div class="print">
+                                <div class="text-center mb-8">
+                                    <h1 class="text-3xl font-bold">Par3-ganu Golf Range</h1>
+                                    <h2 class="text-xl">Analytics Report</h2>
+                                    <p class="text-gray-600">Generated: ${new Date().toLocaleString()}</p>
+                                </div>
+                            </div>
+
+                            <!-- Summary Cards -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                                <div class="report-card p-6 rounded-xl text-center text-white">
+                                    <div class="text-3xl mb-2">📈</div>
+                                    <div class="text-2xl font-bold">RM ${dailyTotals.totalRevenue.toFixed(2)}</div>
+                                    <div class="text-sm opacity-90">Today's Revenue</div>
+                                </div>
+                                <div class="bg-green-500 p-6 rounded-xl text-center text-white">
+                                    <div class="text-3xl mb-2">🛒</div>
+                                    <div class="text-2xl font-bold">${dailyTotals.totalSales}</div>
+                                    <div class="text-sm opacity-90">Today's Sales</div>
+                                </div>
+                                <div class="bg-blue-500 p-6 rounded-xl text-center text-white">
+                                    <div class="text-3xl mb-2">📊</div>
+                                    <div class="text-2xl font-bold">RM ${weeklyTotals.averageDaily.toFixed(2)}</div>
+                                    <div class="text-sm opacity-90">Daily Average (7d)</div>
+                                </div>
+                                <div class="bg-purple-500 p-6 rounded-xl text-center text-white">
+                                    <div class="text-3xl mb-2">⏰</div>
+                                    <div class="text-2xl font-bold">${this.hourlyReports.length}</div>
+                                    <div class="text-sm opacity-90">Hourly Reports</div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                <!-- Staff Performance -->
+                                <div class="bg-white rounded-2xl shadow-xl p-8">
+                                    <h3 class="text-2xl font-bold mb-6">👥 Today's Staff Performance</h3>
+                                    <div class="space-y-4">
+                                        ${Object.keys(staffPerformance).map(staff => `
+                                            <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
+                                                <div>
+                                                    <div class="font-semibold">${staff}</div>
+                                                    <div class="text-sm text-gray-600">${staffPerformance[staff].sales} sales</div>
+                                                </div>
+                                                <div class="text-right">
+                                                    <div class="text-lg font-bold text-green-600">RM ${staffPerformance[staff].revenue.toFixed(2)}</div>
+                                                    <div class="text-sm text-gray-500">Revenue</div>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+
+                                <!-- Peak Hours Chart -->
+                                <div class="bg-white rounded-2xl shadow-xl p-8">
+                                    <h3 class="text-2xl font-bold mb-6">⏰ Sales by Hour</h3>
+                                    <div class="space-y-2">
+                                        ${Object.keys(peakHours).slice(8, 20).map(hour => {
+                                            const maxSales = Math.max(...Object.values(peakHours).map(h => h.sales));
+                                            const percentage = maxSales > 0 ? (peakHours[hour].sales / maxSales) * 100 : 0;
+                                            return `
+                                                <div class="flex items-center space-x-3">
+                                                    <div class="w-12 text-sm font-medium">${hour}:00</div>
+                                                    <div class="flex-1 bg-gray-200 rounded-full h-6">
+                                                        <div class="chart-bar bg-blue-500 h-6 rounded-full flex items-center justify-end pr-2" 
+                                                             style="width: ${percentage}%">
+                                                            <span class="text-white text-xs font-bold">${peakHours[hour].sales}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="w-20 text-sm text-gray-600">RM ${peakHours[hour].revenue.toFixed(2)}</div>
+                                                </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                </div>
+
+                                <!-- Weekly Summary -->
+                                <div class="bg-white rounded-2xl shadow-xl p-8">
+                                    <h3 class="text-2xl font-bold mb-6">📅 7-Day Summary</h3>
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div class="text-center p-4 bg-green-50 rounded-lg">
+                                            <div class="text-2xl font-bold text-green-600">${weeklyTotals.totalSales}</div>
+                                            <div class="text-sm text-gray-600">Total Sales</div>
+                                        </div>
+                                        <div class="text-center p-4 bg-blue-50 rounded-lg">
+                                            <div class="text-2xl font-bold text-blue-600">RM ${weeklyTotals.totalRevenue.toFixed(2)}</div>
+                                            <div class="text-sm text-gray-600">Total Revenue</div>
+                                        </div>
+                                        <div class="text-center p-4 bg-purple-50 rounded-lg">
+                                            <div class="text-2xl font-bold text-purple-600">${weeklyTotals.qrPayments}</div>
+                                            <div class="text-sm text-gray-600">QR Payments</div>
+                                        </div>
+                                        <div class="text-center p-4 bg-yellow-50 rounded-lg">
+                                            <div class="text-2xl font-bold text-yellow-600">${weeklyTotals.cashPayments}</div>
+                                            <div class="text-sm text-gray-600">Cash Payments</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Today's Hourly Reports -->
+                                <div class="bg-white rounded-2xl shadow-xl p-8">
+                                    <h3 class="text-2xl font-bold mb-6">🕐 Today's Hourly Breakdown</h3>
+                                    <div class="max-h-80 overflow-y-auto space-y-3">
+                                        ${todayHourlyReports.length === 0 ? 
+                                            '<div class="text-center py-8 text-gray-500">No hourly reports for today yet</div>' :
+                                            todayHourlyReports.slice().reverse().map(report => `
+                                                <div class="p-4 bg-gray-50 rounded-lg">
+                                                    <div class="flex justify-between items-center mb-2">
+                                                        <div class="font-semibold">${report.time}</div>
+                                                        <div class="text-lg font-bold text-green-600">RM ${report.totalRevenue.toFixed(2)}</div>
+                                                    </div>
+                                                    <div class="grid grid-cols-3 gap-4 text-sm text-gray-600">
+                                                        <div>Sales: ${report.totalSales}</div>
+                                                        <div>QR: ${report.qrPayments} | Cash: ${report.cashPayments}</div>
+                                                        <div>Top: ${report.topStaff}</div>
+                                                    </div>
+                                                </div>
+                                            `).join('')
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Insights -->
+                            <div class="mt-8 bg-white rounded-2xl shadow-xl p-8">
+                                <h3 class="text-2xl font-bold mb-6">💡 Business Insights</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div class="p-4 bg-blue-50 rounded-lg">
+                                        <h4 class="font-semibold text-blue-800 mb-2">Peak Performance</h4>
+                                        <p class="text-sm text-gray-600">
+                                            ${Object.keys(peakHours).reduce((peak, hour) => 
+                                                peakHours[hour].sales > peakHours[peak].sales ? hour : peak, '8'
+                                            )}:00 is your busiest hour with ${Math.max(...Object.values(peakHours).map(h => h.sales))} sales.
+                                        </p>
+                                    </div>
+                                    <div class="p-4 bg-green-50 rounded-lg">
+                                        <h4 class="font-semibold text-green-800 mb-2">Payment Trends</h4>
+                                        <p class="text-sm text-gray-600">
+                                            ${dailyTotals.qrPayments > dailyTotals.cashPayments ? 'QR payments' : 'Cash payments'} 
+                                            are more popular today (${Math.max(dailyTotals.qrPayments, dailyTotals.cashPayments)} vs ${Math.min(dailyTotals.qrPayments, dailyTotals.cashPayments)}).
+                                        </p>
+                                    </div>
+                                    <div class="p-4 bg-purple-50 rounded-lg">
+                                        <h4 class="font-semibold text-purple-800 mb-2">Growth</h4>
+                                        <p class="text-sm text-gray-600">
+                                            ${weeklyTotals.totalRevenue > dailyTotals.totalRevenue * 7 ? 'Strong' : 'Steady'} 
+                                            weekly performance with RM ${weeklyTotals.averageDaily.toFixed(2)} daily average.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
             renderPOS() {
                 const dailyTotals = this.getDailyTotals();
                 
@@ -293,9 +690,14 @@
                                         <p class="text-gray-600 text-xl">Welcome back, ${this.currentUser}</p>
                                     </div>
                                     <div class="flex space-x-4">
+                                        <button onclick="pos.showReports = true; pos.render()" 
+                                                class="bg-purple-500 text-white px-8 py-4 rounded-xl hover:bg-purple-600 flex items-center space-x-3 text-lg font-medium shadow-lg hover:shadow-xl btn">
+                                            <span>📊</span>
+                                            <span>Analytics</span>
+                                        </button>
                                         <button onclick="pos.showSalesHistory = true; pos.render()" 
                                                 class="bg-blue-500 text-white px-8 py-4 rounded-xl hover:bg-blue-600 flex items-center space-x-3 text-lg font-medium shadow-lg hover:shadow-xl btn">
-                                            <span>📊</span>
+                                            <span>📈</span>
                                             <span>Sales History</span>
                                         </button>
                                         <button onclick="pos.showSettings = true; pos.render()" 
@@ -397,9 +799,9 @@
                                         `}
                                     </div>
                                     
-                                    <!-- Daily Summary -->
+                                    <!-- Enhanced Daily Summary -->
                                     <div class="bg-white rounded-2xl shadow-xl p-8 mt-8">
-                                        <h3 class="text-xl font-semibold mb-6">Today's Summary</h3>
+                                        <h3 class="text-xl font-semibold mb-6">Today's Performance</h3>
                                         <div class="space-y-4">
                                             <div class="flex justify-between items-center text-lg">
                                                 <span>Sales:</span>
@@ -409,9 +811,16 @@
                                                 <span>Revenue:</span>
                                                 <span class="font-bold text-2xl text-green-600">RM ${dailyTotals.totalRevenue.toFixed(2)}</span>
                                             </div>
-                                            <div class="flex justify-between text-gray-600">
+                                            <div class="flex justify-between text-gray-600 text-sm">
                                                 <span>QR: ${dailyTotals.qrPayments}</span>
                                                 <span>Cash: ${dailyTotals.cashPayments}</span>
+                                            </div>
+                                            <div class="pt-4 border-t">
+                                                <div class="text-sm text-gray-500 mb-2">Hourly Reports: ${this.hourlyReports.filter(r => r.date === new Date().toLocaleDateString()).length}</div>
+                                                <button onclick="pos.showReports = true; pos.render()" 
+                                                        class="w-full bg-purple-500 text-white py-3 px-4 rounded-lg hover:bg-purple-600 text-sm btn">
+                                                    📊 View Full Analytics
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
